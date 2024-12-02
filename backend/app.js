@@ -5,7 +5,7 @@ const ivm = require('isolated-vm');
 const app = express();
 app.use(express.json())
 app.use(cors({
-    origin: 'http://localhost:3000', // Asumiendo que tu frontend corre en el puerto 3000
+    origin: 'http://localhost:3000',
     methods: ['POST', 'GET', 'OPTIONS'],
     allowedHeaders: ['Content-Type'],
     credentials: true
