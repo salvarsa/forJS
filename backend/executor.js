@@ -1,53 +1,63 @@
 const { workerData, parentPort } = require('worker_threads');
 const ivm = require('isolated-vm');
 
-// Función para ejecutar código en un entorno aislado
 async function executeInIsolate(code) {
-  const isolate = new ivm.Isolate({ memoryLimit: 128 });
+  console.log('Código recibido:', code); // Verifica el código recibido
+
+  const isolate = new ivm.Isolate({ memoryLimit: 128 }); // Limitar memoria a 128 MB
   const context = await isolate.createContext();
   const jail = context.global;
+
   await jail.set('global', jail.derefInto());
-  
+
   let consoleOutput = [];
-
   const logFunction = new ivm.Reference((...args) => {
-    consoleOutput.push(args.map((arg) => String(arg)).join(' '));
+    consoleOutput.push(args.map(arg => String(arg)).join(' '));
   });
-
   await jail.set('log', logFunction);
 
+  const redefineConsole = `
+    global.console = {
+      log: (...args) => log(...args),
+    };
+  `;
+  const redefineScript = await isolate.compileScript(redefineConsole);
+  await redefineScript.run(context);
+
+  // Escapar template strings dentro del código
   const wrappedCode = `
     (function() {
-      const results = [];
-      const originalLog = console.log;
-      console.log = (...args) => {
-        log(...args);
-        results.push(...args);
-      };
-
       try {
-        const result = eval(${JSON.stringify(code)});
-        if (result !== undefined) {
-          results.push(result);
-        }
+        return eval(${JSON.stringify(code)});
       } catch (error) {
-        results.push('Error: ' + error.message);
-      } finally {
-        console.log = originalLog;
+        return 'Error: ' + error.message;
       }
-      return JSON.stringify(results);
     })()
   `;
+  console.log('wrappedCode:', wrappedCode); // Verifica el wrappedCode
 
-  const script = await isolate.compileScript(wrappedCode);
-  const rawResult = await script.run(context, { timeout: 5000 });
-  const result = JSON.parse(rawResult);
+  let script;
+  try {
+    script = await isolate.compileScript(wrappedCode);
+    console.log('Script compilado correctamente'); // Confirma compilación
+  } catch (error) {
+    console.error('Error al compilar el script:', error.message);
+    return { result: `Error al compilar: ${error.message}`, consoleOutput: [] };
+  }
+
+  let result;
+  try {
+    result = await script.run(context, { timeout: 5000 });
+    console.log('Resultado del script:', result); // Verifica ejecución
+  } catch (error) {
+    console.error('Error al ejecutar el script:', error.message);
+    return { result: `Error al ejecutar: ${error.message}`, consoleOutput: [] };
+  }
 
   isolate.dispose();
-  return result.join('\n');
+  return { result, consoleOutput };
 }
 
-// Ejecutar código recibido y enviar respuesta al proceso principal
 executeInIsolate(workerData.code)
-  .then((result) => parentPort.postMessage(result))
-  .catch((error) => parentPort.postMessage(`Error: ${error.message}`));
+  .then(data => parentPort.postMessage(data))
+  .catch(error => parentPort.postMessage({ error: error.message }));
