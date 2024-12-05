@@ -21,6 +21,7 @@ function executeCode(code) {
     const worker = new Worker(path.resolve(__dirname, 'executor.js'), {
       workerData: { code },
     });
+    
     worker.on('message', (data) => resolve(data));
     worker.on('error', reject);
     worker.on('exit', (code) => {
@@ -36,6 +37,8 @@ app.post('/execute', async (req, res) => {
     }
     try {
       const { result, consoleOutput } = await executeCode(code);
+
+
       res.status(200).json({ result, consoleOutput });
       console.log('Respuesta enviada al frontend:', { result, consoleOutput });
     } catch (error) {
