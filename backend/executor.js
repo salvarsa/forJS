@@ -2,7 +2,7 @@ const { workerData, parentPort } = require('worker_threads');
 const ivm = require('isolated-vm');
 
 async function executeInIsolate(code) {
-  console.log('Código recibido:', code); // Verifica el código recibido
+  console.log('Código recibido:', code);
 
   const isolate = new ivm.Isolate({ memoryLimit: 128 }); // Limitar memoria a 128 MB
   const context = await isolate.createContext();
@@ -10,12 +10,14 @@ async function executeInIsolate(code) {
 
   await jail.set('global', jail.derefInto());
 
+  // Capturar salidas de `console.log`
   let consoleOutput = [];
   const logFunction = new ivm.Reference((...args) => {
     consoleOutput.push(args.map(arg => String(arg)).join(' '));
   });
   await jail.set('log', logFunction);
 
+  // Inyectar una versión personalizada de `console`
   const redefineConsole = `
     global.console = {
       log: (...args) => log(...args),
@@ -24,38 +26,32 @@ async function executeInIsolate(code) {
   const redefineScript = await isolate.compileScript(redefineConsole);
   await redefineScript.run(context);
 
-  // Escapar template strings dentro del código
-  const wrappedCode = `
-    (function() {
-      try {
-        return eval(${JSON.stringify(code)});
-      } catch (error) {
-        return 'Error: ' + error.message;
-      }
-    })()
-  `;
-  console.log('wrappedCode:', wrappedCode); // Verifica el wrappedCode
+  let results = [];
 
-  let script;
-  try {
-    script = await isolate.compileScript(wrappedCode);
-    console.log('Script compilado correctamente'); // Confirma compilación
-  } catch (error) {
-    console.error('Error al compilar el script:', error.message);
-    return { result: `Error al compilar: ${error.message}`, consoleOutput: [] };
-  }
+  // Dividir el código en bloques separados por '\n\n'
+  const blocks = code.split('\n\n').map(block => block.trim()).filter(Boolean);
 
-  let result;
-  try {
-    result = await script.run(context, { timeout: 5000 });
-    console.log('Resultado del script:', result); // Verifica ejecución
-  } catch (error) {
-    console.error('Error al ejecutar el script:', error.message);
-    return { result: `Error al ejecutar: ${error.message}`, consoleOutput: [] };
+  for (const block of blocks) {
+    const wrappedCode = `
+      (function() {
+        try {
+          return eval(${JSON.stringify(block)});
+        } catch (error) {
+          return 'Error: ' + error.message;
+        }
+      })()
+    `;
+    try {
+      const script = await isolate.compileScript(wrappedCode);
+      const result = await script.run(context, { timeout: 5000 });
+      results.push(result);
+    } catch (error) {
+      results.push('Error: ' + error.message);
+    }
   }
 
   isolate.dispose();
-  return { result, consoleOutput };
+  return { result: results, consoleOutput };
 }
 
 executeInIsolate(workerData.code)
