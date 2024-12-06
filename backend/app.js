@@ -170,9 +170,6 @@ app.post("/execute", async (req, res) => {
 
   try {
     const { blocks, isComplex } = analyzeAndSplitCode(code);
-    console.log("Bloques detectados:", blocks);
-    console.log("cantidad de bloques:", blocks.lent);
-    console.log("¿Es código complejo?", isComplex);
 
     const result = await executeCode(blocks, {});
     console.log('el resultado', result);
