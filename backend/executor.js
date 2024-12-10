@@ -56,14 +56,7 @@ async function executeCode(blocks, globalContext = {}) {
   const logFunction = new ivm.Reference((type, ...args) => {
     const message = args.map(arg => String(arg)).join(" ");
     consoleOutput.push({ type, message }); // Acumula cada mensaje de consola en lugar de sobrescribir
-  const logFunction = new ivm.Reference((type, ...args) => {
-    const message = args.map(arg => String(arg)).join(" ");
-    consoleOutput.push({ type, message }); // Acumula cada mensaje de consola en lugar de sobrescribir
   });
-  
-  await jail.set("log", logFunction);
-
-  const setupConsole = `
   
   await jail.set("log", logFunction);
 
@@ -103,7 +96,6 @@ async function executeCode(blocks, globalContext = {}) {
           }
         })()
       `;
-      
       const script = await isolate.compileScript(wrappedCode);
       const result = await script.run(context, { timeout: 5000 });
 
