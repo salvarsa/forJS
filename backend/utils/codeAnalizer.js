@@ -26,6 +26,7 @@ function analyzeAndSplitCode(code) {
           details: declarations,
         });
       },
+      
       FunctionDeclaration(node) {
         isComplex = true;
         const funcName = node.id.name;
@@ -84,8 +85,54 @@ function analyzeAndSplitCode(code) {
           },
         });
       },
-    });
+      ForStatement(node) {
+        blocks.push({
+          code: code.slice(node.start, node.end).trim(),
+          type: "for-loop",
+          details: {
+            init: code.slice(node.init.start, node.init.end),
+            test: code.slice(node.test.start, node.test.end),
+            update: code.slice(node.update.start, node.update.end),
+            body: code.slice(node.body.start, node.body.end)
+          }
+        });
+      },
+      
+      IfStatement(node) {
+        const ifBlock = {
+          code: code.slice(node.start, node.end).trim(),
+          type: "if-statement",
+          details: {
+            test: code.slice(node.test.start, node.test.end),
+            consequent: code.slice(node.consequent.start, node.consequent.end),
+            alternate: node.alternate ? code.slice(node.alternate.start, node.alternate.end) : null
+          }
+        };
+        blocks.push(ifBlock);
+      },
   
+      BlockStatement(node) {
+        blocks.push({
+          code: code.slice(node.start, node.end).trim(),
+          type: "block",
+          details: {
+            body: node.body.map(n => code.slice(n.start, n.end))
+          }
+        });
+      },
+  
+      WhileStatement(node) {
+        blocks.push({
+          code: code.slice(node.start, node.end).trim(),
+          type: "while-loop",
+          details: {
+            test: code.slice(node.test.start, node.test.end),
+            body: code.slice(node.body.start, node.body.end)
+          }
+        });
+      }
+    });
+    
     if (currentBlock.trim()) {
       blocks.push({ code: currentBlock.trim(), type: "mixed" });
     }

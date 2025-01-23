@@ -44,19 +44,21 @@ async function executeCode(blocks, globalContext = {}) {
 
 app.post("/execute", async (req, res) => {
   const { code } = req.body;
-  if (!code || typeof code !== "string") {
-    return res.status(400).json({ error: "Código inválido o vacío" });
-  }
-
+  
   try {
-    const { blocks, isComplex } = analyzeAndSplitCode(code);
-
+    const { blocks } = analyzeAndSplitCode(code);
+    console.log('Bloques identificados:', blocks);  // ← Agregar logging
+    
     const result = await executeCode(blocks, {});
-    console.log('el resultado', result);
+    console.log('Resultado ejecución:', result);    // ← Agregar logging
     
     res.status(200).json(result);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error en ejecución:', error);    // ← Mejor logging
+    res.status(500).json({ 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
